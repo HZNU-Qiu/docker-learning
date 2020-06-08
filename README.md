@@ -275,3 +275,89 @@ docker不是虚拟机，这一点要牢记在心，但是作为理解我们可�
 我们开了一个mysql容器，我们进入之后发现很想我们的linux操作系统，我们在里面输入mysql -uroot -pXXXX 我们也能进入到mysql中。哎，说好的禁止套娃呢，这个就可以看成套娃行为，在我们本机上又开了一个linux系统，我们在里面操作我们的mysql，就是这样。
 
 对于数据持久化，我们在写yml配置文件的时候，就发现了我们将docker容器的的目录与本机的目录对应了起来，容器被删除了，我们本地的数据都还在。我们只需要在重新启动一个docker容器的时候将数据卷挂载到我们本地这边绑定就好了，所以说，熟悉的配方熟悉的味道~
+
+---
+
+# 这次是使用Docker部署Vue项目
+
+## 背景：
+可以说是某种机缘巧合或者就是我自己想造作。。。大作业需要部署emmm...明明可以直接使用nginx正向代理完事了，但是都2020年了，2020耶，不在项目外边包一层docker真的拿不出手（误）
+
+---
+# Let's do it!
+## 首先Vue的项目得先打包（如何打包这里不做赘述）
+打包成dist文件扔到服务器上。
+
+## 重头戏开始！
+- ### 在dist的根目录下也就是与dist同级目录下，创建nginx目录并进入
+  ```
+  mkdir nginx
+  cd nginx
+  ```
+
+- ### 创建default.conf并且编辑
+  
+  ```
+  server {
+    listen       8005;
+    server_name  localhost;
+
+    #charset koi8-r;
+    access_log  /var/log/nginx/host.access.log  main;
+    error_log  /var/log/nginx/error.log  error;
+
+    location / {
+        root   /usr/share/nginx/html;
+        index  index.html index.htm;
+    }
+    # 配置反向代理，这里一定要问清楚前端他的根路径！！！
+    location /v1/ {
+      # 配置反向代理将前台的请求转发成如下，也就是服务端api
+      proxy_pass http://120.27.247.78:3000/v1/;
+    }
+
+
+    #error_page  404              /404.html;
+
+    # redirect server error pages to the static page /50x.html
+    #
+    error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root   /usr/share/nginx/html;
+    }
+  }
+  ```
+- ### 创建Dockerfile准备打包镜像
+  ```
+  vi Dockerfile
+  
+  # 这里是Dockerfile编辑内容
+  FROM nginx
+  ```
+  没错相信你的眼睛，我没在开玩笑，就是这样，为什么？我下面会解释
+
+- ### 求豆麻袋~我这里还是先说一下正常打包镜像如何配置Dockerfile
+  ```
+  FROM nginx
+  COPY dist/ /usr/share/nginx/html/
+  COPY nginx/default.conf /etc/nginx/conf.d/default.conf
+  ```
+  ’COPY dist/ /usr/share/nginx/html/‘ 这个命令是将与Dockerfile同级目录下dist目录中的内容复制到docker容器中的/usr/share/nginx/html/下
+  
+  那’COPY nginx/default.conf /etc/nginx/conf.d/default.conf‘也是同理咯，不需要再说了吧？
+
+- ### 然后就是打包镜像
+  ```
+  docker build -t vuenginxcontainer .
+  ```
+  -t 是给image命名，同时不要忘记最后的  **"."**
+
+  然后是查看一下我们的镜像文件
+  ```
+  docker image ls | grep vuenginxcontainer
+  ```
+  最后启动我们的docker容器
+  ```
+  docker run -p 8005:8005 -d --name vueApp vuenginxcontainer
+  ```
+  结束！但是真的结束了吗？
