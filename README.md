@@ -360,4 +360,69 @@ docker不是虚拟机，这一点要牢记在心，但是作为理解我们可�
   ```
   docker run -p 8005:8005 -d --name vueApp vuenginxcontainer
   ```
-  结束！但是真的结束了吗？
+  
+  ### 结束！但是真的结束了吗？
+  假如我们的docker内配置文件不用更改以后都不用更改，那么真的结束了。如果以后需要更改配置文件，那么我们需要的工作量，先停止容器，删除容器，删除镜像，更改配置文件，重新打包，运行容器。
+
+  那么，能不能简化一下呢？只需要更改配置文件再重启容器那岂不美哉？还记得刚刚Dockerfile里只有FROM nginx这一句话的Dockerfile文件吗？这就是我们接下来要解决的——使用挂载启动容器。
+
+  ```
+  docker run -p 8005:8005 -d --name vuenginxnew --mount type=bind,source=$HOME/SelfWork/docker/vueclidemo/nginx,target=/etc/nginx/conf.d --mount type=bind,source=$HOME/SelfWork/docker/vueclidemo/dist,target=/usr/share/nginx/html nginx
+  ```
+  **上面的路径是我本地的路径，一个是dist文件夹的路径另一个是default.conf所在的目录，根据自己情况选择路径，使用绝对路径也是可以的**
+
+  我们使用数据挂载来部署容器，每当我们更改挂载的配置文件并且重新启动容器就可以完成更改。总结一下流程，创建镜像时输入上述命令，需要更改配置文件：修改配置文件然后docker restart {containerId} 结束~，虽然创建image麻烦了一点，但是今后需要进行修改配置文件，咱们又是一条好汉！
+
+- ### 好了结束了，真的结束了，可能有些地方阐述的不准确但是自己若干个月后能看懂就行~如果你在看，那么谢谢你，忍住想揍我的心看到了这里。感谢！
+
+# Nginx proxy_pass的那些事儿
+```
+server {
+   listen       80;
+   server_name  localhost;
+
+   location /api1/ {
+           proxy_pass http://localhost:8080;
+        }
+   # http://localhost/api1/xxx -> http://localhost:8080/api1/xxx
+
+
+   location /api2/ {
+           proxy_pass http://localhost:8080/;
+        }
+   # http://localhost/api2/xxx -> http://localhost:8080/xxx
+
+
+   location /api3 {
+           proxy_pass http://localhost:8080;
+        }
+   # http://localhost/api3/xxx -> http://localhost:8080/api3/xxx
+
+
+   location /api4 {
+           proxy_pass http://localhost:8080/;
+        }
+   # http://localhost/api4/xxx -> http://localhost:8080//xxx，请注意这里的双斜线，好好分析一下。
+
+
+   location /api5/ {
+           proxy_pass http://localhost:8080/haha;
+        }
+   # http://localhost/api5/xxx -> http://localhost:8080/hahaxxx，请注意这里的haha和xxx之间没有斜杠，分析一下原因。
+
+   location /api6/ {
+           proxy_pass http://localhost:8080/haha/;
+        }
+   # http://localhost/api6/xxx -> http://localhost:8080/haha/xxx
+
+   location /api7 {
+           proxy_pass http://localhost:8080/haha;
+        }
+   # http://localhost/api7/xxx -> http://localhost:8080/haha/xxx
+
+   location /api8 {
+           proxy_pass http://localhost:8080/haha/;
+        }
+  # http://localhost/api8/xxx -> http://localhost:8080/haha//xxx，请注意这里的双斜杠。
+}
+```
